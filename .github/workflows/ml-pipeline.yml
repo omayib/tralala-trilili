@@ -1,0 +1,62 @@
+# ML pipeline harian (data -> training -> validation -> rilis model ke Hugging Face).
+# App Streamlit memuat model terbaru dari HF Hub (cache 1 jam), jadi tidak perlu redeploy.
+# Kegagalan (scrape gagal, model ditolak validation gate, prediction bias) = workflow merah
+# -> GitHub mengirim notifikasi email ke pemilik repo.
+name: ML pipeline
+
+on:
+  schedule:
+    - cron: "0 19 * * *"   # 02:00 WIB setiap hari (Kworb diperbarui harian)
+  workflow_dispatch:
+    inputs:
+      skip_scrape:
+        description: "Lewati scraping (latih ulang dari data terakhir di HF)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ml-pipeline
+  cancel-in-progress: false
+
+env:
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  HF_MODEL_REPO: ${{ vars.HF_MODEL_REPO || 'omayib/tralala-trilili' }}
+  HF_DATASET_REPO: ${{ vars.HF_DATASET_REPO || 'omayib/tralala-trilili-data' }}
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Data -> train -> validate -> release
+        run: python -m src.pipeline --publish ${{ inputs.skip_scrape && '--skip-scrape' || '' }}
+      - name: Simpan artefak run (metadata, benchmark)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-${{ github.run_id }}
+          path: |
+            models/metadata.json
+            models/benchmark.csv
+            data/pivot_performance.csv
+          if-no-files-found: ignore
+
+  monitoring:
+    needs: pipeline
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Cek prediction bias 7 hari terakhir
+        run: python -m src.monitoring

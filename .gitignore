@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.streamlit/secrets.toml
+# Data (berisi lirik berhak cipta) disimpan di HF dataset repo privat,
+# model di HF model registry — keduanya tidak masuk git.
+data/
+models/

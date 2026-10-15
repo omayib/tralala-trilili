@@ -1,0 +1,33 @@
+# CI + rilis aplikasi: test setiap push/PR; bila lolos di main, branch `streamlit-release`
+# dimajukan dan Streamlit Community Cloud (yang memantau branch itu) otomatis redeploy.
+name: CI & app release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  release-app:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Majukan branch streamlit-release ke commit yang sudah lolos test
+        run: git push origin HEAD:refs/heads/streamlit-release
