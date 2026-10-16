@@ -101,7 +101,8 @@ def main():
         "cv_f1_macro": float(search.best_score_),
         "test_metrics": {k: float(v) for k, v in metrics.items()},
         "baseline_metrics": {k: float(v) for k, v in baseline.items()},
-        "benchmark": bench.drop(columns="best_params").round(4).fillna(0).to_dict(orient="records"),
+        "benchmark": [{k: (None if pd.isna(v) else v) for k, v in r.items()}  # NaN -> null (JSON)
+                      for r in bench.drop(columns="best_params").round(4).to_dict(orient="records")],
     }
     (MODEL_DIR / "metadata.json").write_text(json.dumps(meta, indent=2))
     print(f"\nModel -> {MODEL_DIR / 'virality_model.joblib'}")

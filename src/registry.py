@@ -55,10 +55,12 @@ def push_data(message: str) -> str:
 def download_model(revision: str = HF_MODEL_REVISION, local_dir: Path | None = None) -> Path | None:
     """Unduh model produksi. Return folder berisi MODEL_FILES, atau None bila belum ada rilis."""
     try:
-        return Path(snapshot_download(HF_MODEL_REPO, revision=revision, allow_patterns=MODEL_FILES,
+        path = Path(snapshot_download(HF_MODEL_REPO, revision=revision, allow_patterns=MODEL_FILES,
                                       local_dir=local_dir))
     except _MISSING:
         return None
+    # Repo yang baru dibuat (ensure_repos) ada tetapi kosong -> sama dengan belum ada rilis
+    return path if all((path / f).exists() for f in MODEL_FILES) else None
 
 
 def production_metadata(revision: str = HF_MODEL_REVISION) -> dict | None:
@@ -72,7 +74,8 @@ def production_metadata(revision: str = HF_MODEL_REVISION) -> dict | None:
 def _model_card(meta: dict) -> str:
     template = (Path(__file__).resolve().parent.parent / "cards" / "MODEL_CARD.md").read_text()
     rows = "\n".join(
-        f"| {b['model']} | {b['cv_f1']:.3f} | {b['accuracy']:.3f} | {b['balanced_accuracy']:.3f} | "
+        f"| {b['model']} | {'—' if b['cv_f1'] is None else format(b['cv_f1'], '.3f')} | "
+        f"{b['accuracy']:.3f} | {b['balanced_accuracy']:.3f} | "
         f"{b['precision']:.3f} | {b['recall']:.3f} | {b['f1']:.3f} |" for b in meta["benchmark"])
     m = meta["test_metrics"]
     return template.format(
