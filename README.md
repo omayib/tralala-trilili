@@ -126,6 +126,11 @@ Catatan: GitHub menonaktifkan *scheduled workflow* setelah 60 hari tanpa aktivit
   puncak), PkStreams (streaming harian tertinggi), Total. Kworb tidak menyediakan streaming
   harian per lagu, sehingga *Streaming Harian* = `peak_streams` dan `avg_daily_streams = Total / Days`.
   *Posisi* = peringkat berdasarkan total streaming.
+- **Profil lirik di app** (`src/lyric_profile.py`, tanpa model ML): tema dari leksikon/ontologi kecil
+  pop Indonesia dan struktur lagu (panjang, repetisi, hook, keragaman kosakata), dibandingkan dengan
+  lagu chart. Petunjuk arah ("lagu populer cenderung kurang repetitif") hanya tampil bila
+  asosiasinya signifikan pada train split (Spearman, koreksi Benjamini-Hochberg); acuan ini dihitung
+  ulang dan dirilis bersama tiap model.
 - **Lagu**: hanya lirik berbahasa Indonesia (`text_utils.is_indonesian`), lirik identik cukup sekali.
 - **Popularity** = `total_streams / days`. **Label 3 kelas (kuartil):** Kurang populer (< Q1),
   Cukup populer (Q1..<Q3), Sangat populer (≥ Q3). Dihitung ulang tiap run, jadi validasi selalu

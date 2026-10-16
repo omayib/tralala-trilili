@@ -16,6 +16,7 @@ for _k in ("HF_TOKEN", "HF_MODEL_REPO", "HF_DATASET_REPO", "HF_MODEL_REVISION"):
         break
 
 from src.config import HF_MODEL_REPO, HF_MODEL_REVISION, MODEL_DIR  # noqa: E402
+from src.lyric_profile import explain  # noqa: E402
 from src.monitoring import PredictionLogger  # noqa: E402
 from src.text_utils import clean_lyrics, is_indonesian  # noqa: E402
 
@@ -43,6 +44,11 @@ st.markdown(
       .bar .val {width: 2.8rem; text-align: right; flex: none;}
       .chip {display: inline-block; padding: .2rem .6rem; margin: .15rem; border-radius: 999px;
              background: #2A2A2A; font-size: .85rem;}
+      .prof {display: grid; grid-template-columns: 1fr auto; gap: .1rem .75rem; padding: .55rem 0;
+             border-bottom: 1px solid #2A2A2A; font-size: .9rem;}
+      .prof .v {font-weight: 700; text-align: right;}
+      .prof .d {grid-column: 1 / -1; color: #A7A7A7; font-size: .8rem;}
+      .note {color: #A7A7A7; font-size: .8rem; margin-top: .4rem;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -86,6 +92,26 @@ def top_terms(model, text: str, k: int = 8):
     return [names[i] for i in idx[:k] if coef[i] > 0]
 
 
+def render_profile(ex: dict) -> None:
+    """Tema & struktur lirik dibanding lagu chart, plus arah asosiasi yang didukung data."""
+    st.markdown("#### Profil lirik")
+    if ex["themes"]:
+        arrow = lambda rho: "" if rho is None else (" ↑" if rho > 0 else " ↓")
+        st.markdown("**Tema menonjol:** " + "".join(
+            f'<span class="chip">{label}{arrow(rho)}</span>' for label, _, rho in ex["themes"]),
+            unsafe_allow_html=True)
+    else:
+        st.markdown("**Tema menonjol:** tidak ada yang menonjol dibanding lagu chart.")
+    st.markdown("".join(
+        f'<div class="prof"><span>{r["label"]}</span><span class="v">{r["value"]}</span>'
+        f'<span class="d">{r["position"]}'
+        + (f' · {r["hint"]}' if r["hint"] else "") + "</span></div>"
+        for r in ex["structure"]), unsafe_allow_html=True)
+    st.markdown('<div class="note">↑/↓ = tema lebih sering/jarang pada lagu populer. Petunjuk hanya '
+                "ditampilkan bila asosiasinya signifikan pada data chart (koreksi Benjamini-Hochberg); "
+                "asosiasi lemah dan bukan sebab-akibat.</div>", unsafe_allow_html=True)
+
+
 model, meta, model_source = load_model()
 
 st.title("🎵 Tralala-Trilili")
@@ -95,7 +121,7 @@ st.caption("Prediksi tingkat popularitas lirik lagu berbahasa Indonesia berdasar
 lyrics = st.text_area("Lirik lagu kamu", height=260,
                       placeholder="Tempel atau tulis lirik lagu di sini…")
 
-if st.button("Prediksi Popularitas", type="primary"):
+if st.button("Prediksi Popularitas", type="primary", width="stretch"):
     cleaned = clean_lyrics(lyrics)
     if len(cleaned.split()) < 20:
         st.warning("Lirik terlalu pendek — masukkan minimal ±20 kata agar prediksi bermakna.")
@@ -123,6 +149,8 @@ if st.button("Prediksi Popularitas", type="primary"):
             st.markdown("**Kata pendorong 'Sangat populer':** " +
                         "".join(f'<span class="chip">{t}</span>' for t in terms),
                         unsafe_allow_html=True)
+        if ref := meta.get("lyric_profile"):  # rilis model lama belum memuatnya
+            render_profile(explain(lyrics, ref))
 
 with st.expander("Tentang model"):
     m, thr = meta["test_metrics"], meta["thresholds_streams_per_day"]

@@ -2,11 +2,14 @@
 import json
 
 import joblib
+import pandas as pd
 import pytest
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from streamlit.testing.v1 import AppTest
+
+from src.lyric_profile import reference_stats
 
 
 @pytest.fixture
@@ -19,7 +22,8 @@ def tiny_model_dir(tmp_path, monkeypatch):
     (tmp_path / "metadata.json").write_text(json.dumps({
         "best_model": "TF-IDF + Logistic Regression", "trained_on": "2026-01-01", "n_songs": 30,
         "thresholds_streams_per_day": {"q1": 1000.0, "q3": 5000.0}, "test_metrics": m,
-        "benchmark": [{"model": "TF-IDF + Logistic Regression", **m}]}))
+        "benchmark": [{"model": "TF-IDF + Logistic Regression", **m}],
+        "lyric_profile": reference_stats(pd.Series(texts), pd.Series([100.0, 1.0, 10.0] * 10))}))
     monkeypatch.setattr("src.config.MODEL_DIR", tmp_path)
     monkeypatch.setattr("src.registry.download_model", lambda *a, **k: None)
     monkeypatch.delenv("HF_TOKEN", raising=False)
@@ -34,3 +38,4 @@ def test_app_predicts(tiny_model_dir):
     assert not at.exception
     assert any("Sangat populer" in m.value and "keyakinan" in m.value for m in at.markdown)
     assert any("lokal" in m.value for m in at.markdown)
+    assert any("Profil lirik" in m.value for m in at.markdown)

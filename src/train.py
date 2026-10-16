@@ -23,6 +23,7 @@ from sklearn.pipeline import Pipeline
 
 from src.config import DATA_DIR, MODEL_DIR, ROOT
 from src.features import CLASS_NAMES, split_mask
+from src.lyric_profile import reference_stats
 
 DATA_PATH = DATA_DIR / "dataset_labeled.csv"
 SEED = 42
@@ -101,6 +102,8 @@ def main():
         "cv_f1_macro": float(search.best_score_),
         "test_metrics": {k: float(v) for k, v in metrics.items()},
         "baseline_metrics": {k: float(v) for k, v in baseline.items()},
+        # Acuan profil lirik untuk penjelasan di app (hanya dari train split)
+        "lyric_profile": reference_stats(df.loc[~test, "lyrics_raw"], df.loc[~test, "streams_per_day"]),
         "benchmark": [{k: (None if pd.isna(v) else v) for k, v in r.items()}  # NaN -> null (JSON)
                       for r in bench.drop(columns="best_params").round(4).to_dict(orient="records")],
     }

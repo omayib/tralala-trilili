@@ -11,14 +11,14 @@ untuk semua lagu tanpa kebocoran ke test set. Hasil di-cache per lirik.
   struktur : repetisi/hook, keragaman kosakata, rima, panjang, porsi bahasa Inggris, register kata ganti
 """
 import hashlib
-import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from src.config import DATA_DIR
-from src.text_utils import clean_lyrics, language_ratios
+from src.lyric_profile import STRUCTURE, structure_features
+from src.text_utils import clean_lyrics
 
 CACHE = DATA_DIR / "semantic_features.csv"
 EMOT_DIR = DATA_DIR / "emot_model"
@@ -40,9 +40,6 @@ THEMES = {
     "persahabatan": ["sahabat selamanya", "teman yang selalu ada", "kita bersama melewati hari"],
     "kesepian": ["aku sendiri dalam sepi", "lelah menjalani hidup ini", "tak ada yang peduli padaku"],
 }
-STRUCTURE = ["n_words", "n_lines", "words_per_line", "type_token_ratio", "unique_line_ratio",
-             "repeated_line_share", "top_line_repeats", "rhyme_rate", "english_share",
-             "id_function_share", "pron_aku_kamu", "pron_gue_lo", "pron_saya_anda"]
 THEME_COLS = [f"theme_{t}" for t in THEMES]
 EMOTION_COLS = [f"emo_{e}" for e in EMOTIONS]
 FEATURES = THEME_COLS + EMOTION_COLS + STRUCTURE
@@ -57,30 +54,7 @@ def _lines(raw: str) -> list[str]:
     return [l for l in lines if l]
 
 
-# ---------------- Struktur ----------------
-
-def structure_features(raw: str) -> dict:
-    lines = _lines(raw)
-    words = " ".join(lines).split()
-    n_w, n_l = len(words), max(len(lines), 1)
-    counts = pd.Series(lines).value_counts() if lines else pd.Series(dtype=int)
-    ends = [l.split()[-1] for l in lines if l.split()]
-    rhymes = sum(a[-2:] == b[-2:] for a, b in zip(ends, ends[1:]))
-    id_share, en_share = language_ratios(" ".join(words))
-    per = lambda vocab: sum(w in vocab for w in words) / max(n_w, 1) * 100  # per 100 kata
-    return {
-        "n_words": n_w, "n_lines": len(lines), "words_per_line": n_w / n_l,
-        "type_token_ratio": len(set(words)) / max(n_w, 1),
-        "unique_line_ratio": len(counts) / n_l,
-        "repeated_line_share": counts[counts > 1].sum() / n_l if len(counts) else 0.0,  # porsi baris yang berulang
-        "top_line_repeats": int(counts.max()) if len(counts) else 0,                   # kekuatan hook
-        "rhyme_rate": rhymes / max(len(ends) - 1, 1),
-        "english_share": en_share,
-        "id_function_share": id_share,
-        "pron_aku_kamu": per({"aku", "kamu", "kau", "engkau", "ku", "mu", "dirimu", "diriku"}),
-        "pron_gue_lo": per({"gue", "gua", "gw", "lo", "lu", "elo", "elu"}),
-        "pron_saya_anda": per({"saya", "anda"}),
-    }
+# Struktur: implementasi bersama dengan app -> src/lyric_profile.structure_features
 
 
 # ---------------- Tema ----------------
