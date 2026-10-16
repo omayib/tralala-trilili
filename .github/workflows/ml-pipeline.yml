@@ -1,5 +1,5 @@
 # ML pipeline harian (data -> training -> validation -> rilis model ke Hugging Face).
-# App Streamlit memuat model terbaru dari HF Hub (cache 1 jam), jadi tidak perlu redeploy.
+# App Streamlit memeriksa rilis terbaru di HF Hub tiap 5 menit, jadi tidak perlu redeploy.
 # Kegagalan (scrape gagal, model ditolak validation gate, prediction bias) = workflow merah
 # -> GitHub mengirim notifikasi email ke pemilik repo.
 name: ML pipeline

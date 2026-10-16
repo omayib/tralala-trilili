@@ -63,6 +63,14 @@ def download_model(revision: str = HF_MODEL_REVISION, local_dir: Path | None = N
     return path if all((path / f).exists() for f in MODEL_FILES) else None
 
 
+def latest_revision(revision: str = HF_MODEL_REVISION) -> str | None:
+    """Commit sha rilis yang ditunjuk `revision` (branch/tag), atau None bila Hub tak terjangkau."""
+    try:
+        return HfApi().model_info(HF_MODEL_REPO, revision=revision).sha
+    except Exception:
+        return None
+
+
 def production_metadata(revision: str = HF_MODEL_REVISION) -> dict | None:
     try:
         return json.loads(Path(hf_hub_download(HF_MODEL_REPO, "metadata.json",

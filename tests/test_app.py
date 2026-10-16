@@ -26,6 +26,7 @@ def tiny_model_dir(tmp_path, monkeypatch):
         "lyric_profile": reference_stats(pd.Series(texts), pd.Series([100.0, 1.0, 10.0] * 10))}))
     monkeypatch.setattr("src.config.MODEL_DIR", tmp_path)
     monkeypatch.setattr("src.registry.download_model", lambda *a, **k: None)
+    monkeypatch.setattr("src.registry.latest_revision", lambda *a, **k: None)
     monkeypatch.delenv("HF_TOKEN", raising=False)
     return tmp_path
 

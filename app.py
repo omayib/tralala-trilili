@@ -55,14 +55,21 @@ st.markdown(
 )
 
 
-@st.cache_resource(ttl=3600, show_spinner="Memuat model…")
-def load_model():
-    """Ambil model produksi dari HF registry (dicek ulang tiap jam -> rilis baru otomatis
-    terpakai tanpa redeploy). Fallback ke models/ lokal bila Hub tidak terjangkau."""
-    source = f"{HF_MODEL_REPO}@{HF_MODEL_REVISION}"
+@st.cache_data(ttl=300, show_spinner=False)
+def release_sha() -> str | None:
+    """Sha rilis terbaru di HF registry, dicek tiap 5 menit (murah: hanya metadata repo)."""
+    from src.registry import latest_revision
+    return latest_revision()
+
+
+@st.cache_resource(max_entries=2, show_spinner="Memuat model…")
+def load_model(sha: str | None):
+    """Model + metadata untuk satu rilis. Di-cache per sha, jadi rilis baru terpakai dalam
+    ±5 menit tanpa redeploy. Fallback ke models/ lokal bila Hub tidak terjangkau."""
+    source = f"{HF_MODEL_REPO}@{(sha or HF_MODEL_REVISION)[:7]}"
     try:
         from src.registry import download_model
-        model_dir = download_model() or MODEL_DIR
+        model_dir = download_model(revision=sha or HF_MODEL_REVISION) or MODEL_DIR
     except Exception:  # jaringan / Hub bermasalah
         model_dir = MODEL_DIR
     if model_dir == MODEL_DIR:
@@ -112,7 +119,7 @@ def render_profile(ex: dict) -> None:
                 "asosiasi lemah dan bukan sebab-akibat.</div>", unsafe_allow_html=True)
 
 
-model, meta, model_source = load_model()
+model, meta, model_source = load_model(release_sha())
 
 st.title("🎵 Tralala-Trilili")
 st.caption("Prediksi tingkat popularitas lirik lagu berbahasa Indonesia berdasarkan data "

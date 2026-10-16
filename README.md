@@ -35,7 +35,7 @@ Terinspirasi oleh Lubis & Huda (2025) — lihat [Sitasi](#sitasi). Hasil benchma
  │ RELEASE         push model + model card + tag vYYYYMMDD-HHMM ke HF      │
  └─────────────────────────────────────────────────────────────────────────┘
                                    │ (model repo publik)
- SERVING   Streamlit app ◀─────────┘ memuat model dari HF (cache 1 jam, tanpa redeploy)
+ SERVING   Streamlit app ◀─────────┘ memuat rilis terbaru dari HF (cek tiap 5 menit)
            GitHub Actions: ci.yml — test → majukan branch `streamlit-release`
            → Streamlit Community Cloud redeploy otomatis
  MONITORING  app log prediksi (tanpa lirik) → HF dataset `predictions/`
@@ -115,7 +115,7 @@ Tiap tahap juga bisa dijalankan sendiri: `python -m src.scraper_kworb`, `src.scr
    Tanpa secret, app tetap jalan (model publik), hanya logging yang nonaktif.
 
 Setelah itu: push ke `main` → test → app redeploy; setiap hari → model baru dirilis bila
-lolos validasi dan app memakainya dalam ≤ 1 jam. **Rollback model:** set secret
+lolos validasi dan app memakainya dalam ±5 menit. **Rollback model:** set secret
 `HF_MODEL_REVISION = "v20261016-1900"` (tag lama) di Streamlit.
 
 Catatan: GitHub menonaktifkan *scheduled workflow* setelah 60 hari tanpa aktivitas repo.
