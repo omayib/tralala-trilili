@@ -17,6 +17,7 @@ Protokol (bebas kebocoran):
 
   python -m experiments.benchmark                          # M0-M4 (CPU)
   python -m experiments.benchmark --split artist --gpu     # + M5 embedding & M6 IndoBERT (GPU)
+  python -m experiments.benchmark --semantic --only B0 M2 M7 M8   # fitur semantik (experiments/semantic.py)
 """
 import argparse
 import hashlib
@@ -37,7 +38,9 @@ from sklearn.metrics import (accuracy_score, balanced_accuracy_score, f1_score,
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.naive_bayes import ComplementNB
+from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import FeatureUnion, Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, LinearSVC
 
 from src.config import DATA_DIR, ROOT
@@ -82,7 +85,7 @@ def split_test(df: pd.DataFrame, by: str, frac: float = 0.2) -> np.ndarray:
 
 # ---------------- Methods ----------------
 
-def methods(gpu: bool) -> dict:
+def methods(gpu: bool, semantic: bool = False) -> dict:
     lr = dict(max_iter=3000, class_weight="balanced")
     m = {
         "B0 Baseline kelas mayoritas": (Pipeline([("tfidf", TfidfVectorizer()),
@@ -116,6 +119,19 @@ def methods(gpu: bool) -> dict:
             Pipeline([("emb", Embedder()), ("clf", LogisticRegression(**lr))]),
             {"clf__C": [0.01, 0.1, 1, 10]}, "f1_macro")
         m["M6 Fine-tuning IndoBERT (3-seed ensemble)"] = None  # bukan sklearn, lihat finetune.py
+    if semantic:
+        from experiments.semantic import FEATURES
+        m["M7 Semantik: tema+emosi+struktur + LogReg"] = (
+            Pipeline([("features", ColumnTransformer([("sem", StandardScaler(), FEATURES)])),
+                      ("clf", LogisticRegression(**lr))]),
+            {"clf__C": [0.01, 0.1, 1, 10]}, "f1_macro")
+        m["M8 TF-IDF + semantik + LogReg"] = (
+            Pipeline([("features", ColumnTransformer([
+                          ("tfidf", TfidfVectorizer(sublinear_tf=True, min_df=2, ngram_range=(1, 2)), "lyrics_clean"),
+                          ("sem", StandardScaler(), FEATURES)])),
+                      ("clf", LogisticRegression(**lr))]),
+            {"features__transformer_weights": [{"tfidf": 1, "sem": w} for w in (0.03, 0.1, 0.3)],
+             "clf__C": [0.1, 1, 10]}, "f1_macro")
     return m
 
 
@@ -211,10 +227,14 @@ def main():
     ap.add_argument("--split", choices=["song", "artist"], default="song")
     ap.add_argument("--tasks", nargs="+", default=["3class", "binary"])
     ap.add_argument("--gpu", action="store_true", help="sertakan M5 embedding & M6 fine-tuning IndoBERT")
+    ap.add_argument("--semantic", action="store_true", help="sertakan M7/M8 (fitur semantik, butuh GPU sekali)")
     ap.add_argument("--only", nargs="*", help="jalankan metode tertentu saja, mis. M0 M2")
     args = ap.parse_args()
 
     df = build_dataset()
+    if args.semantic:
+        from experiments.semantic import semantic_features
+        df = pd.concat([df, semantic_features(df)], axis=1)
     test = split_test(df, args.split)
     print(f"Split per {args.split}: train {(~test).sum()} | test {test.sum()} | "
           f"artis di keduanya: {len(set(df.artist[test]) & set(df.artist[~test]))}")
@@ -224,14 +244,17 @@ def main():
         y, names = make_labels(df["score"], task)
         X = df["lyrics_clean"]
         X_tr, X_te, y_tr, y_te = X[~test], X[test], y[~test], y[test]
+        F_tr, F_te = df[~test], df[test]  # M7/M8 butuh kolom fitur semantik, bukan hanya teks
         dist = ", ".join(f"{n}={c}" for n, c in zip(names, np.bincount(y, minlength=len(names))))
         print(f"\n=== {task} | split={args.split} | {dist} ===")
         rows = []
-        for name, spec in methods(args.gpu).items():
+        for name, spec in methods(args.gpu, args.semantic).items():
             if args.only and name.split()[0] not in args.only:
                 continue
             if spec is None:
                 res = evaluate_finetune(name, X_tr, y_tr, X_te, y_te, len(names))
+            elif name.split()[0] in ("M7", "M8"):
+                res = evaluate(name, *spec, F_tr, y_tr, F_te, y_te)
             else:
                 res = evaluate(name, *spec, X_tr, y_tr, X_te, y_te)
             rows.append({"task": task, "split": args.split,
@@ -240,6 +263,9 @@ def main():
                   f"F1={res['f1_macro']:.3f} [{res['f1_ci_low']:.3f}-{res['f1_ci_high']:.3f}] "
                   f"({res['seconds']}s)", flush=True)
         out = REPORT_DIR / f"benchmark_{task}_{args.split}.csv"
+        if out.exists():  # gabung dengan hasil run sebelumnya: baris metode yang sama diganti
+            rows = pd.concat([pd.read_csv(out).loc[lambda d: ~d.method.isin([r["method"] for r in rows])],
+                              pd.DataFrame(rows)]).to_dict(orient="records")
         pd.DataFrame(rows).to_csv(out, index=False)
         print(f"  -> {out}")
 
