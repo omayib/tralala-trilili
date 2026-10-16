@@ -1,4 +1,4 @@
-"""Tahap 6 — Antarmuka web mobile-first (Streamlit) untuk prediksi viralitas lirik."""
+"""Tahap 6 — Antarmuka web mobile-first (Streamlit) untuk prediksi popularitas lirik."""
 import json
 import os
 from pathlib import Path
@@ -17,9 +17,13 @@ for _k in ("HF_TOKEN", "HF_MODEL_REPO", "HF_DATASET_REPO", "HF_MODEL_REVISION"):
 
 from src.config import HF_MODEL_REPO, HF_MODEL_REVISION, MODEL_DIR  # noqa: E402
 from src.monitoring import PredictionLogger  # noqa: E402
-from src.text_utils import clean_lyrics  # noqa: E402
+from src.text_utils import clean_lyrics, is_indonesian  # noqa: E402
 
-TIERS = [(0.65, "Tinggi", "🔥", "#1DB954"), (0.40, "Sedang", "✨", "#F5A623"), (0.0, "Rendah", "🌱", "#E05252")]
+# (label, ikon, warna) per kelas model: 0 kurang, 1 cukup, 2 sangat populer
+CLASSES = [("Kurang populer", "🌱", "#E05252"), ("Cukup populer", "✨", "#F5A623"),
+           ("Sangat populer", "🔥", "#1DB954")]
+PAPER = ("Lubis, Q. L. A., & Huda, A. A. (2025). Implementation of SVM Algorithm to Predict Song "
+         "Popularity based on Sentiment Analysis of Lyrics. *JAIC*, 9(2), 265–272.")
 
 st.set_page_config(page_title="Tralala-Trilili", page_icon="🎵", layout="centered")
 st.markdown(
@@ -32,6 +36,11 @@ st.markdown(
                background: #1E1E1E; border: 2px solid var(--c);}
       .result .pct {font-size: 3rem; font-weight: 800; color: var(--c); line-height: 1.1;}
       .result .tier {font-size: 1.1rem; font-weight: 600;}
+      .bar {display: flex; align-items: center; gap: .5rem; margin: .35rem 0; font-size: .9rem;}
+      .bar .name {width: 7.5rem; flex: none;}
+      .bar .track {flex: 1; height: .6rem; border-radius: 999px; background: #2A2A2A; overflow: hidden;}
+      .bar .fill {height: 100%; border-radius: 999px;}
+      .bar .val {width: 2.8rem; text-align: right; flex: none;}
       .chip {display: inline-block; padding: .2rem .6rem; margin: .15rem; border-radius: 999px;
              background: #2A2A2A; font-size: .85rem;}
     </style>
@@ -62,17 +71,14 @@ def get_logger():
     return PredictionLogger()
 
 
-def tier_of(p: float):
-    return next(t for t in TIERS if p >= t[0])
-
-
 def top_terms(model, text: str, k: int = 8):
-    """Kata dalam lirik yang paling mendorong ke arah 'Viral' (hanya untuk model linear)."""
+    """Kata dalam lirik yang paling mendorong ke kelas 'Sangat populer' (hanya model linear)."""
     clf, vec = model.named_steps["clf"], model.named_steps["tfidf"]
     coef = getattr(clf, "coef_", None)
     if coef is None:
         return []
-    coef = coef.toarray().ravel() if hasattr(coef, "toarray") else np.asarray(coef).ravel()
+    coef = coef.toarray() if hasattr(coef, "toarray") else np.asarray(coef)
+    coef = coef[-1]  # baris kelas terakhir = Sangat populer (biner: satu-satunya baris)
     x = vec.transform([text])
     contrib = x.multiply(coef).tocsr()
     idx = contrib.indices[np.argsort(contrib.data)[::-1]]
@@ -83,42 +89,53 @@ def top_terms(model, text: str, k: int = 8):
 model, meta, model_source = load_model()
 
 st.title("🎵 Tralala-Trilili")
-st.caption("Prediksi peluang viral lirik lagu berdasarkan data historis Spotify Indonesia.")
+st.caption("Prediksi tingkat popularitas lirik lagu berbahasa Indonesia berdasarkan data "
+           "historis chart Spotify Indonesia.")
 
 lyrics = st.text_area("Lirik lagu kamu", height=260,
                       placeholder="Tempel atau tulis lirik lagu di sini…")
 
-if st.button("Prediksi Viralitas", type="primary"):
+if st.button("Prediksi Popularitas", type="primary"):
     cleaned = clean_lyrics(lyrics)
     if len(cleaned.split()) < 20:
         st.warning("Lirik terlalu pendek — masukkan minimal ±20 kata agar prediksi bermakna.")
     else:
-        p = float(model.predict_proba([cleaned])[0, 1])
-        _, label, icon, color = tier_of(p)
-        get_logger().log(p, label, len(cleaned.split()), meta.get("trained_at", meta["trained_on"]))
+        if not is_indonesian(cleaned):
+            st.info("Lirik ini tampaknya bukan berbahasa Indonesia — model dilatih khusus pada "
+                    "lirik Indonesia, jadi hasilnya kurang dapat diandalkan.")
+        proba = model.predict_proba([cleaned])[0]
+        k = int(np.argmax(proba))
+        label, icon, color = CLASSES[k]
+        get_logger().log(float(proba[-1]), label, len(cleaned.split()),
+                         meta.get("trained_at", meta["trained_on"]))
         st.markdown(
-            f'<div class="result" style="--c:{color}"><div class="pct">{p:.0%}</div>'
-            f'<div class="tier">{icon} Potensi {label}</div></div>',
+            f'<div class="result" style="--c:{color}"><div class="pct">{icon} {label}</div>'
+            f'<div class="tier">keyakinan model {proba[k]:.0%}</div></div>',
             unsafe_allow_html=True,
         )
+        st.markdown("".join(
+            f'<div class="bar"><span class="name">{n}</span><span class="track">'
+            f'<span class="fill" style="display:block;width:{p:.0%};background:{c}"></span></span>'
+            f'<span class="val">{p:.0%}</span></div>'
+            for (n, _, c), p in zip(CLASSES, proba)), unsafe_allow_html=True)
         terms = top_terms(model, cleaned)
         if terms:
-            st.markdown("**Kata pendorong viral:** " +
+            st.markdown("**Kata pendorong 'Sangat populer':** " +
                         "".join(f'<span class="chip">{t}</span>' for t in terms),
                         unsafe_allow_html=True)
 
 with st.expander("Tentang model"):
-    m = meta["test_metrics"]
+    m, thr = meta["test_metrics"], meta["thresholds_streams_per_day"]
     st.markdown(
-        f"- Model: **{meta['best_model']}** (TF-IDF), dilatih {meta['trained_on']} "
-        f"pada **{meta['n_songs']:,}** lagu dari chart Spotify Indonesia (kworb.net).\n"
-        f"- *Viral* = rasio total streams / hari di chart ≥ "
-        f"**{meta['viral_threshold_streams_per_day']:,.0f}** (top {meta['viral_rate']:.0%}).\n"
-        f"- Test set: accuracy {m['accuracy']:.2f} · precision {m['precision']:.2f} · "
-        f"recall {m['recall']:.2f} · F1 {m['f1']:.2f}.\n"
-        f"- Tingkat potensi: Rendah < 40% ≤ Sedang < 65% ≤ Tinggi.\n"
+        f"- Model: **{meta['best_model']}**, dilatih {meta['trained_on']} pada "
+        f"**{meta['n_songs']:,}** lagu berbahasa Indonesia dari chart Spotify Indonesia (kworb.net).\n"
+        f"- *Popularity* = total streams / jumlah hari di chart. Kelas (kuartil): Kurang < "
+        f"**{thr['q1']:,.0f}** ≤ Cukup < **{thr['q3']:,.0f}** ≤ Sangat populer (streams/hari).\n"
+        f"- Test set: accuracy {m['accuracy']:.2f} · balanced accuracy {m['balanced_accuracy']:.2f} · "
+        f"macro-F1 {m['f1']:.2f}.\n"
         f"- Sumber model: `{model_source}`.\n\n"
-        "Lirik hanyalah salah satu faktor viralitas — artis, promosi, dan aransemen "
-        "musik juga sangat berpengaruh. Gunakan hasil ini sebagai indikasi, bukan kepastian."
+        "Lirik hanyalah salah satu faktor popularitas — artis, promosi, dan aransemen musik juga "
+        "sangat berpengaruh. Gunakan hasil ini sebagai indikasi, bukan kepastian.\n\n"
+        f"Terinspirasi oleh {PAPER}"
     )
     st.dataframe(meta["benchmark"], hide_index=True, width="stretch")

@@ -31,3 +31,31 @@ def clean_lyrics(text: str) -> str:
     text = text.lower().replace("'", "").replace("’", "")
     text = _NON_ALPHA_RE.sub(" ", text)
     return _SPACE_RE.sub(" ", text).strip()
+
+
+# Kata fungsi paling umum (bukan daftar stopword lengkap) — cukup untuk membedakan bahasa lirik.
+_ID_WORDS = frozenset("""
+aku kau kamu engkau dia kita kami mereka ku mu nya yang dan di ke dari ini itu tak tidak bukan
+akan sudah telah masih belum pernah selalu hanya juga lagi saja pun jangan bila jika kalau saat
+ketika karena tapi namun atau dengan untuk pada dalam bagai seperti apa siapa mengapa kenapa
+bagaimana dimana kini nanti mungkin ingin mau bisa harus ada semua satu hati cinta rindu sayang
+""".split())
+_EN_WORDS = frozenset("""
+i you he she we they me my your our their it is am are was were be been the a an and or but of
+to in on at for with from this that what when where why how not no do does did don can will
+just so all if love like know want get got go now one never
+""".split())
+
+
+def language_ratios(clean_text: str) -> tuple[float, float]:
+    """Proporsi token yang merupakan kata fungsi Indonesia / Inggris (input: hasil clean_lyrics)."""
+    words = clean_text.split()
+    n = len(words) or 1
+    return sum(w in _ID_WORDS for w in words) / n, sum(w in _EN_WORDS for w in words) / n
+
+
+def is_indonesian(clean_text: str, min_ratio: float = 0.08) -> bool:
+    """Lirik berbahasa Indonesia: kata fungsi Indonesia cukup banyak dan bahasa Inggris tidak
+    dominan (reff/interjeksi Inggris tetap boleh). Lagu berbahasa daerah umumnya < min_ratio."""
+    id_r, en_r = language_ratios(clean_text)
+    return id_r >= min_ratio and en_r < 2 * id_r

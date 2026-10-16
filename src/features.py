@@ -1,16 +1,28 @@
-"""Tahap 3 — Feature engineering, tabel pivot, dan pelabelan Virality Score."""
+"""Tahap 3 — Seleksi lagu Indonesia, feature engineering, tabel pivot, dan label popularitas.
+
+Popularity = total streams / jumlah hari di chart harian Spotify Indonesia (Kworb).
+Label 3 kelas berdasarkan kuartil (mengikuti Lubis & Huda, 2025):
+  0 kurang populer (< Q1) | 1 cukup populer (Q1..<Q3) | 2 sangat populer (>= Q3)
+"""
 import argparse
 import hashlib
 
 import pandas as pd
 
 from src.config import DATA_DIR, TEST_FRACTION
+from src.text_utils import is_indonesian
 
 IN_PATH = DATA_DIR / "songs_with_lyrics.csv"
 OUT_PATH = DATA_DIR / "dataset_labeled.csv"
 PIVOT_PATH = DATA_DIR / "pivot_performance.csv"
 
-DEFAULT_QUANTILE = 0.75  # top 25% rasio streams/hari = "Viral"
+CLASS_NAMES = ["Kurang populer", "Cukup populer", "Sangat populer"]
+
+
+def select_songs(df: pd.DataFrame) -> pd.DataFrame:
+    """Hanya lirik berbahasa Indonesia; lirik identik (versi akustik/remix, dsb.) cukup sekali."""
+    df = df[df["lyrics_clean"].fillna("").map(is_indonesian)]
+    return df.drop_duplicates(subset="lyrics_clean").reset_index(drop=True)
 
 
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -23,22 +35,24 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def label(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    q1, q3 = df["streams_per_day"].quantile([0.25, 0.75])
+    df = df.copy()
+    df["label"] = 0
+    df.loc[df["streams_per_day"] >= q1, "label"] = 1
+    df.loc[df["streams_per_day"] >= q3, "label"] = 2
+    return df, {"q1": float(q1), "q3": float(q3)}
+
+
 def build_pivot(df: pd.DataFrame) -> pd.DataFrame:
-    """Pivot rasio performa: rata-rata streams/hari per kelompok durasi chart & label."""
+    """Pivot rasio performa: median streams/hari & jumlah lagu per durasi chart × kelas."""
     return pd.pivot_table(
-        df, index="days_bucket", columns="viral",
+        df, index="days_bucket", columns="label",
         values=["streams_per_day", "total_streams"],
         aggfunc={"streams_per_day": "median", "total_streams": "count"},
         observed=False,
-    ).rename(columns={0: "Non-Viral", 1: "Viral", "total_streams": "jumlah_lagu",
-                      "streams_per_day": "median_streams_per_day"})
-
-
-def label(df: pd.DataFrame, quantile: float = DEFAULT_QUANTILE) -> tuple[pd.DataFrame, float]:
-    threshold = df["streams_per_day"].quantile(quantile)
-    df = df.copy()
-    df["viral"] = (df["streams_per_day"] >= threshold).astype(int)
-    return df, float(threshold)
+    ).rename(columns={i: n for i, n in enumerate(CLASS_NAMES)} |
+             {"total_streams": "jumlah_lagu", "streams_per_day": "median_streams_per_day"})
 
 
 def is_test(artist: str, title: str) -> bool:
@@ -52,18 +66,15 @@ def split_mask(df: pd.DataFrame) -> pd.Series:
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--quantile", type=float, default=DEFAULT_QUANTILE)
-    args = ap.parse_args()
-
-    df = add_features(pd.read_csv(IN_PATH))
-    df, threshold = label(df, args.quantile)
-    pivot = build_pivot(df)
-    pivot.to_csv(PIVOT_PATH)
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    raw = pd.read_csv(IN_PATH)
+    df = add_features(select_songs(raw))
+    df, thr = label(df)
+    build_pivot(df).to_csv(PIVOT_PATH)
     df.to_csv(OUT_PATH, index=False)
-    print(f"Ambang Viral: >= {threshold:,.0f} streams/hari (kuantil {args.quantile})")
-    print(df["viral"].value_counts().rename({1: "Viral", 0: "Non-Viral"}).to_string())
-    print("\nPivot performa:\n", pivot.round(0).to_string())
+    print(f"{len(raw):,} lagu berlirik -> {len(df):,} lagu Indonesia unik")
+    print(f"Ambang streams/hari: Q1={thr['q1']:,.0f}  Q3={thr['q3']:,.0f}")
+    print(df["label"].value_counts().sort_index().rename(dict(enumerate(CLASS_NAMES))).to_string())
 
 
 if __name__ == "__main__":

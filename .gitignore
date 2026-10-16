@@ -7,3 +7,5 @@ __pycache__/
 # model di HF model registry — keduanya tidak masuk git.
 data/
 models/
+.env
+references/

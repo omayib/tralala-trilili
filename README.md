@@ -1,10 +1,13 @@
-# 🎵 Tralala-Trilili — Spotify Lyric Virality Predictor
+# 🎵 Tralala-Trilili — Indonesian Lyric Popularity Predictor
 
-Pipeline end-to-end untuk memprediksi potensi viral sebuah lirik lagu berdasarkan
-data historis chart Spotify Indonesia ([kworb.net](https://kworb.net/spotify/country/id_daily_totals.html)),
+Pipeline end-to-end untuk memprediksi tingkat popularitas (Kurang / Cukup / Sangat populer)
+sebuah lirik lagu berbahasa Indonesia berdasarkan data historis chart Spotify Indonesia ([kworb.net](https://kworb.net/spotify/country/id_daily_totals.html)),
 dengan antarmuka web **Streamlit**, model registry di **Hugging Face Hub**, dan otomasi
 **GitHub Actions** mengikuti pola
 [Google ML pipelines](https://developers.google.com/machine-learning/managing-ml-projects/pipelines).
+
+Terinspirasi oleh Lubis & Huda (2025) — lihat [Sitasi](#sitasi). Hasil benchmark 7 metode
+(termasuk SVM + SMOTE ala paper dan fine-tuning IndoBERT): **[reports/BENCHMARK.md](reports/BENCHMARK.md)**.
 
 ## Arsitektur ML pipeline
 
@@ -13,9 +16,9 @@ dengan antarmuka web **Streamlit**, model registry di **Hugging Face Hub**, dan 
  ┌──────────────────────────── src/pipeline.py ────────────────────────────┐
  │ DATA            pull HF dataset → scraper_kworb → scraper_lyrics        │
  │                 (inkremental, cache) → features → push HF dataset (v+1) │
- │ TRAINING        train.py: TF-IDF × SVM/LR/NB/RF + GridSearch            │
+ │ TRAINING        train.py: TF-IDF + LogReg (class_weight) + GridSearch   │
  │ VALIDATION      validate.py: kandidat vs produksi di golden test set    │
- │                 lolos bila F1 tidak turun > 0.02  ──✗──▶ workflow merah │
+ │                 ditolak bila macro-F1 turun > 0.02 ──✗──▶ workflow merah│
  │ RELEASE         push model + model card + tag vYYYYMMDD-HHMM ke HF      │
  └─────────────────────────────────────────────────────────────────────────┘
                                    │ (model repo publik)
@@ -48,17 +51,19 @@ tralala-trilili/
 │   ├── scraper_kworb.py       # Tahap 1 — scraping & cleaning tabel Kworb
 │   ├── scraper_lyrics.py      # Tahap 2 — scraping lirik (LRCLIB) + parsing, inkremental
 │   ├── text_utils.py          # pembersih lirik (dipakai training & app)
-│   ├── features.py            # Tahap 3 — rasio streams/hari, pivot, label, golden split
-│   ├── train.py               # Tahap 4–5 — SVM + tuning, benchmark, serialisasi
+│   ├── features.py            # Tahap 3 — lagu Indonesia, streams/hari, label 3 kelas, golden split
+│   ├── train.py               # Tahap 4–5 — TF-IDF + LogReg (M2 benchmark), serialisasi
 │   ├── validate.py            # validation gate
 │   ├── registry.py            # artifact store HF Hub (data & model)
 │   ├── monitoring.py          # log prediksi & cek prediction bias
 │   └── pipeline.py            # orkestrator (lokal = CI)
+├── experiments/               # reproduksi paper + benchmark M0–M6 (GPU untuk M5/M6)
+├── reports/                   # BENCHMARK.md + hasil mentah (CSV)
 ├── cards/                     # template model card & dataset card
 ├── tests/                     # unit test + smoke test app
 ├── .github/workflows/         # ci.yml (test + rilis app), ml-pipeline.yml (harian)
 ├── data/  models/             # artefak lokal (tidak di-commit; ada di HF Hub)
-└── requirements.txt  requirements-dev.txt
+└── requirements*.txt          # app/pipeline · dev (pytest) · experiments
 ```
 
 ## Menjalankan lokal
@@ -108,11 +113,21 @@ Catatan: GitHub menonaktifkan *scheduled workflow* setelah 60 hari tanpa aktivit
   puncak), PkStreams (streaming harian tertinggi), Total. Kworb tidak menyediakan streaming
   harian per lagu, sehingga *Streaming Harian* = `peak_streams` dan `avg_daily_streams = Total / Days`.
   *Posisi* = peringkat berdasarkan total streaming.
-- **Label Viral (1)**: `total_streams / days` ≥ kuantil ke-75 (top 25%); sisanya Non-Viral (0).
-  Label dihitung ulang tiap run, jadi validasi selalu memakai label terkini.
+- **Lagu**: hanya lirik berbahasa Indonesia (`text_utils.is_indonesian`), lirik identik cukup sekali.
+- **Popularity** = `total_streams / days`. **Label 3 kelas (kuartil):** Kurang populer (< Q1),
+  Cukup populer (Q1..<Q3), Sangat populer (≥ Q3). Dihitung ulang tiap run, jadi validasi selalu
+  memakai label terkini.
 - **Golden test set**: model yang dirilis hanya dilatih pada train split, sehingga test set
   tidak pernah dilihat versi mana pun dan perbandingan antar-versi adil.
 - **Lirik** diambil dari [LRCLIB](https://lrclib.net) (API publik, tanpa key); lagu tanpa
   lirik atau < 20 kata (mis. instrumental) dibuang.
-- Lirik hanya salah satu faktor viralitas, sehingga akurasi model berbasis lirik saja
-  memang terbatas — lihat `models/benchmark.csv`.
+- Lirik hanya salah satu faktor popularitas, sehingga akurasi model berbasis lirik saja
+  memang terbatas — lihat [reports/BENCHMARK.md](reports/BENCHMARK.md).
+
+## Sitasi
+
+Proyek ini terinspirasi oleh:
+
+> Lubis, Q. L. A., & Huda, A. A. (2025). Implementation of SVM Algorithm to Predict Song
+> Popularity based on Sentiment Analysis of Lyrics. *Journal of Applied Informatics and
+> Computing (JAIC)*, 9(2), 265–272. http://jurnal.polibatam.ac.id/index.php/JAIC

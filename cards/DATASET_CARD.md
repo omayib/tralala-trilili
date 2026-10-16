@@ -17,8 +17,8 @@ sehingga setiap model di registry bisa ditelusuri ke revisi data yang dipakainya
 | `kworb_id_daily_totals.csv` | posisi, artist, title, track_id, days, days_top10, peak_position, peak_times, peak_streams, total_streams, avg_daily_streams | kworb.net (scrape harian) |
 | `lyrics_cache.jsonl` | `{"key": "artist\|\|\|title", "lyrics": "..."}` — cache lirik mentah (inkremental) | lrclib.net |
 | `songs_with_lyrics.csv` | data Kworb + `lyrics_raw`, `lyrics_clean`, `word_count` (≥ 20 kata) | gabungan |
-| `dataset_labeled.csv` | + `streams_per_day`, `days_bucket`, `viral` (0/1) | `src/features.py` |
-| `pivot_performance.csv` | median streams/hari & jumlah lagu per durasi chart × label | `src/features.py` |
+| `dataset_labeled.csv` | lagu berbahasa Indonesia unik + `streams_per_day`, `days_bucket`, `label` (0 kurang / 1 cukup / 2 sangat populer, kuartil) | `src/features.py` |
+| `pivot_performance.csv` | median streams/hari & jumlah lagu per durasi chart × kelas | `src/features.py` |
 
 Catatan: Kworb tidak menyediakan streaming harian per lagu; `avg_daily_streams = total / days`.
 Label berubah seiring waktu karena total streams terus bertambah dan ambang dihitung ulang.

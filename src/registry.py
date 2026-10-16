@@ -72,15 +72,16 @@ def production_metadata(revision: str = HF_MODEL_REVISION) -> dict | None:
 def _model_card(meta: dict) -> str:
     template = (Path(__file__).resolve().parent.parent / "cards" / "MODEL_CARD.md").read_text()
     rows = "\n".join(
-        f"| {b['model']} | {b['cv_f1']:.3f} | {b['accuracy']:.3f} | {b['precision']:.3f} | "
-        f"{b['recall']:.3f} | {b['f1']:.3f} |" for b in meta["benchmark"])
+        f"| {b['model']} | {b['cv_f1']:.3f} | {b['accuracy']:.3f} | {b['balanced_accuracy']:.3f} | "
+        f"{b['precision']:.3f} | {b['recall']:.3f} | {b['f1']:.3f} |" for b in meta["benchmark"])
     m = meta["test_metrics"]
     return template.format(
         repo=HF_MODEL_REPO, best_model=meta["best_model"], trained_at=meta["trained_at"], git_sha=meta["git_sha"],
         data_revision=meta["data_revision"], n_songs=meta["n_songs"], n_train=meta["n_train"],
-        n_test=meta["n_test"], viral_rate=meta["viral_rate"],
-        threshold=meta["viral_threshold_streams_per_day"], accuracy=m["accuracy"],
-        precision=m["precision"], recall=m["recall"], f1=m["f1"], benchmark_rows=rows,
+        n_test=meta["n_test"], q1=meta["thresholds_streams_per_day"]["q1"],
+        q3=meta["thresholds_streams_per_day"]["q3"], accuracy=m["accuracy"],
+        balanced_accuracy=m["balanced_accuracy"], precision=m["precision"], recall=m["recall"],
+        f1=m["f1"], benchmark_rows=rows,
         validation=json.dumps(meta.get("validation", {}), indent=2),
     )
 

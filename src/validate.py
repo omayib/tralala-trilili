@@ -1,7 +1,7 @@
 """Validation pipeline — gerbang sebelum model baru dirilis.
 
 Kandidat (models/) dan model produksi (HF registry) dievaluasi pada golden test set yang
-SAMA dengan label terkini. Kandidat lolos bila F1-nya tidak lebih buruk dari produksi
+SAMA dengan label terkini. Kandidat lolos bila macro-F1-nya tidak lebih buruk dari produksi
 melebihi toleransi. Hasil ditulis ke models/metadata.json["validation"].
 
 Exit code: 0 = lolos (boleh rilis), 1 = ditolak (alert lewat kegagalan workflow).
@@ -34,7 +34,7 @@ def decide(cand: dict, prod: dict | None, n_songs: int) -> tuple[bool, str]:
 def main() -> int:
     df = pd.read_csv(DATA_DIR / "dataset_labeled.csv").dropna(subset=["lyrics_clean"])
     test = df[split_mask(df)]
-    X, y = test["lyrics_clean"], test["viral"]
+    X, y = test["lyrics_clean"], test["label"]
 
     cand = evaluate(y, joblib.load(MODEL_DIR / "virality_model.joblib").predict(X))
     with tempfile.TemporaryDirectory() as tmp:
@@ -53,9 +53,9 @@ def main() -> int:
     meta_path.write_text(json.dumps(meta, indent=2))
 
     report = (f"### Validation gate: {'✅ LOLOS' if passed else '❌ DITOLAK'}\n\n{reason}\n\n"
-              "| | accuracy | precision | recall | F1 |\n|---|---|---|---|---|\n"
+              "| | accuracy | balanced acc | macro-P | macro-R | macro-F1 |\n|---|---|---|---|---|---|\n"
               + "".join(f"| {name} | " + " | ".join(f"{m[k]:.3f}" for k in
-                        ("accuracy", "precision", "recall", "f1")) + " |\n"
+                        ("accuracy", "balanced_accuracy", "precision", "recall", "f1")) + " |\n"
                         for name, m in (("kandidat", cand), ("produksi", prod)) if m))
     print(report)
     if summary := os.getenv("GITHUB_STEP_SUMMARY"):

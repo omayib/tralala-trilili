@@ -1,11 +1,12 @@
 """Monitoring — log prediksi dari app & cek prediction bias.
 
 App menulis log ke folder lokal; `CommitScheduler` mengunggahnya berkala ke dataset repo
-(`predictions/`). Lirik TIDAK disimpan — hanya peluang, tingkat, jumlah kata, dan versi model.
+(`predictions/`). Lirik TIDAK disimpan — hanya peluang "Sangat populer", kelas prediksi,
+jumlah kata, dan versi model.
 Logging aktif hanya bila HF_TOKEN tersedia (Streamlit secrets).
 
-`python -m src.monitoring` membandingkan rata-rata peluang prediksi 7 hari terakhir dengan
-proporsi label Viral saat training (prediction bias, lihat Google ML pipelines).
+`python -m src.monitoring` membandingkan rata-rata peluang "Sangat populer" 7 hari terakhir
+dengan proporsi kelas itu saat training (prediction bias, lihat Google ML pipelines).
 """
 import json
 import os
@@ -17,7 +18,7 @@ from pathlib import Path
 from src.config import HF_DATASET_REPO, HF_MODEL_REPO
 
 LOG_DIR = Path(os.getenv("PREDICTION_LOG_DIR", "/tmp/tralala_trilili_predictions"))
-BIAS_ALERT = 0.15  # selisih absolut rata-rata prediksi vs viral_rate training
+BIAS_ALERT = 0.15  # selisih absolut rata-rata P(sangat populer) vs proporsinya saat training
 
 
 class PredictionLogger:
@@ -53,10 +54,11 @@ def check_bias(days: int = 7) -> int:
     if not probas:
         print(f"Belum ada prediksi dalam {days} hari terakhir.")
         return 0
-    mean, rate = sum(probas) / len(probas), meta["viral_rate"]
+    dist = meta["class_distribution"]
+    mean, rate = sum(probas) / len(probas), dist["Sangat populer"] / sum(dist.values())
     alert = abs(mean - rate) > BIAS_ALERT
-    report = (f"### Monitoring ({days} hari)\n\n{len(probas)} prediksi · rata-rata peluang "
-              f"**{mean:.1%}** vs proporsi Viral saat training **{rate:.1%}** "
+    report = (f"### Monitoring ({days} hari)\n\n{len(probas)} prediksi · rata-rata P(Sangat populer) "
+              f"**{mean:.1%}** vs proporsinya saat training **{rate:.1%}** "
               f"{'⚠️ prediction bias tinggi' if alert else '✅ normal'}\n")
     print(report)
     if summary := os.getenv("GITHUB_STEP_SUMMARY"):
