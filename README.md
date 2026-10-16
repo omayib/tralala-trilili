@@ -1,5 +1,18 @@
 # 🎵 Tralala-Trilili — Indonesian Lyric Popularity Predictor
 
+<p align="center">
+  <a href="https://tralala-trilili.streamlit.app">
+    <img src="docs/assets/tralala-trilili.webp" width="360" alt="Tampilan aplikasi Tralala-Trilili">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://tralala-trilili.streamlit.app"><b>Coba aplikasinya</b></a> ·
+  <a href="https://omayib.github.io/tralala-trilili/">Website</a> ·
+  <a href="https://huggingface.co/omayib/tralala-trilili">Model di Hugging Face</a> ·
+  <a href="reports/BENCHMARK.md">Benchmark</a>
+</p>
+
 Pipeline end-to-end untuk memprediksi tingkat popularitas (Kurang / Cukup / Sangat populer)
 sebuah lirik lagu berbahasa Indonesia berdasarkan data historis chart Spotify Indonesia ([kworb.net](https://kworb.net/spotify/country/id_daily_totals.html)),
 dengan antarmuka web **Streamlit**, model registry di **Hugging Face Hub**, dan otomasi

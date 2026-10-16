@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tralala-Trilili — Prediksi Popularitas Lirik Lagu Indonesia</title>
+  <meta name="description" content="Prediksi tingkat popularitas lirik lagu berbahasa Indonesia berdasarkan data historis chart Spotify Indonesia.">
+  <meta property="og:title" content="Tralala-Trilili">
+  <meta property="og:description" content="Prediksi tingkat popularitas lirik lagu berbahasa Indonesia.">
+  <meta property="og:image" content="assets/tralala-trilili.webp">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+  <style>
+    :root {
+      --bg: #121212; --surface: #1e1e1e; --border: #2a2a2a;
+      --text: #f5f5f5; --muted: #a7a7a7; --accent: #1db954;
+    }
+    @media (prefers-color-scheme: light) {
+      :root { --bg: #fafafa; --surface: #ffffff; --border: #e3e3e3; --text: #191414; --muted: #5c5c5c; --accent: #128a3e; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.6;
+           font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    a { color: var(--accent); }
+    main { max-width: 1040px; margin: 0 auto; padding: 48px 16px 64px; }
+    .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; }
+    h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.1; margin: 0 0 16px; }
+    .lead { font-size: 1.15rem; color: var(--muted); margin: 0 0 28px; }
+    .buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn { display: inline-block; padding: 12px 22px; border-radius: 999px; font-weight: 700;
+           text-decoration: none; border: 2px solid var(--accent); }
+    .btn.primary { background: var(--accent); color: #fff; }
+    .btn.secondary { color: var(--accent); }
+    .shot { width: 100%; max-width: 440px; justify-self: center; border-radius: 16px;
+            border: 1px solid var(--border); box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+    h2 { font-size: 1.4rem; margin: 56px 0 16px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+    .card .num { font-size: 1.9rem; font-weight: 800; color: var(--accent); }
+    .card p { margin: 4px 0 0; color: var(--muted); font-size: .95rem; }
+    ol { padding-left: 1.2rem; }
+    li { margin: 6px 0; }
+    blockquote { margin: 0; padding: 16px 20px; background: var(--surface); border-left: 4px solid var(--accent);
+                 border-radius: 0 10px 10px 0; color: var(--muted); font-size: .95rem; }
+    footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
+    @media (max-width: 760px) {
+      main { padding-top: 32px; }
+      .hero { grid-template-columns: 1fr; gap: 32px; }
+      .cards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div>
+      <h1>🎵 Tralala-Trilili</h1>
+      <p class="lead">Prediksi tingkat popularitas lirik lagu berbahasa Indonesia — Kurang, Cukup,
+        atau Sangat populer — berdasarkan data historis chart harian Spotify Indonesia.</p>
+      <div class="buttons">
+        <a class="btn primary" href="https://tralala-trilili.streamlit.app">Coba aplikasinya</a>
+        <a class="btn secondary" href="https://github.com/omayib/tralala-trilili">Kode di GitHub</a>
+      </div>
+    </div>
+    <img class="shot" src="assets/tralala-trilili.webp" width="669" height="899"
+         alt="Tampilan aplikasi Tralala-Trilili: lirik dimasukkan, hasil prediksi Cukup populer dengan peluang tiap kelas dan kata pendorong">
+  </section>
+
+  <h2>Hasil benchmark</h2>
+  <div class="cards">
+    <div class="card"><div class="num">1.260</div><p>lagu berbahasa Indonesia unik dari chart Spotify Indonesia, lirik dari LRCLIB</p></div>
+    <div class="card"><div class="num">0,45</div><p>macro-F1 model produksi (3 kelas), dua kali baseline kelas mayoritas (0,22)</p></div>
+    <div class="card"><div class="num">0,63</div><p>macro-F1 terbaik (fine-tuning IndoBERT, biner, artis baru)</p></div>
+  </div>
+  <p>Tujuh metode dibandingkan dengan protokol bebas kebocoran data, dari SVM + SMOTE hingga
+    fine-tuning IndoBERT. Lirik membawa sinyal popularitas yang nyata tetapi moderat.
+    <a href="https://github.com/omayib/tralala-trilili/blob/main/reports/BENCHMARK.md">Baca laporan benchmark</a>.</p>
+
+  <h2>Cara kerja</h2>
+  <ol>
+    <li><strong>Data:</strong> scraping harian chart <a href="https://kworb.net/spotify/country/id_daily_totals.html">Kworb</a> dan lirik <a href="https://lrclib.net">LRCLIB</a>; hanya lirik berbahasa Indonesia.</li>
+    <li><strong>Label:</strong> popularity = total streams ÷ jumlah hari di chart, dibagi tiga kelas berdasarkan kuartil.</li>
+    <li><strong>Model:</strong> TF-IDF + Logistic Regression berbobot kelas, dilatih ulang otomatis setiap hari lewat GitHub Actions.</li>
+    <li><strong>Rilis:</strong> model baru dirilis ke <a href="https://huggingface.co/omayib/tralala-trilili">Hugging Face</a> hanya bila lolos validation gate; aplikasi memakainya tanpa redeploy.</li>
+  </ol>
+
+  <h2>Sitasi</h2>
+  <blockquote>Proyek ini terinspirasi oleh: Lubis, Q. L. A., &amp; Huda, A. A. (2025). Implementation of SVM
+    Algorithm to Predict Song Popularity based on Sentiment Analysis of Lyrics. <em>Journal of Applied
+    Informatics and Computing (JAIC)</em>, 9(2), 265–272.</blockquote>
+
+  <footer>Lirik hanyalah salah satu faktor popularitas — gunakan hasil prediksi sebagai indikasi, bukan kepastian.</footer>
+</main>
+</body>
+</html>
