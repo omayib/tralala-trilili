@@ -37,6 +37,6 @@ def test_app_predicts(tiny_model_dir):
     at.text_area[0].input("aku cinta kamu selamanya " * 6).run()
     at.button[0].click().run()
     assert not at.exception
-    assert any("Sangat populer" in m.value and "keyakinan" in m.value for m in at.markdown)
+    assert any("Berpotensi viral" in m.value and "keyakinan" in m.value for m in at.markdown)
     assert any("lokal" in m.value for m in at.markdown)
     assert any("Profil lirik" in m.value for m in at.markdown)
